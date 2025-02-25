@@ -1,38 +1,37 @@
-from aiogram import types, Dispatcher, Bot, executor
-from decouple import config
+# main.py
+from aiogram import executor
 import logging
+from handlers import (commands, echo, quiz, FSM_registration,
+                      FSM_store, send_products, delete_products)
+from config import dp, Admins, bot
+import buttons
+from db import main_db
 
-token = config("TOKEN")
-
-bot = Bot(token=token)
-dp = Dispatcher(bot)
-admins = [1193518366,]
-
-
-@dp.message_handler(commands="start")
-async def start_handler(message: types.Message):
-    await bot.send_message(chat_id=message.from_user.id,
-                           text=f'Hello {message.from_user.first_name}!\n'
-                           f'Твой Telegam ID - {message.from_user.id}\n')
-    await message.answer('Привет мир')
+async def on_startup(_):
+    for admin in Admins:
+        await bot.send_message(chat_id=admin, text='Бот включен!', reply_markup=buttons.start)
+        await main_db.create_tables()
 
 
-@dp.message_handler(commands="meme")
-async def meme_handler(message: types.Message):
-    with open('media/IMG_2840.jpg', 'rb') as image:
-        await bot.send_photo(chat_id=message.from_user.id,
-                             photo=image)
+async def on_shutdown(_):
+    for admin in Admins:
+        await bot.send_message(chat_id=admin, text='Бот выключен!')
 
 
-@dp.message_handler()
-async def echo_or_square(message: types.Message):
-    try:
-        number = float(message.text)
-        await message.answer(str(number ** 2))
-    except ValueError:
-        await message.answer(message.text)
+# ====================================================================
+commands.register_handlers(dp)
+quiz.register_handlers(dp)
+FSM_registration.register_handlers_fsm(dp)
+FSM_store.register_handlers_store(dp)
+
+send_products.register_handlers(dp)
+delete_products.register_handlers(dp)
+
+# ==========================
+echo.register_handlers(dp)
+# ====================================================================
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    executor.start_polling(dp, skip_updates=True)
+    executor.start_polling(dp, skip_updates=True, on_startup=on_startup, on_shutdown=on_shutdown)
